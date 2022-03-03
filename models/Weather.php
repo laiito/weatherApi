@@ -47,12 +47,12 @@ class Weather extends Model
                 $cacheCity = $cache->get($this->city);
                 if ($cacheCity) {
                     // Город в кэше найден
-                    $cacheCity = json_decode($cacheCity, true);
+                    $cacheCity = $cacheCity;
                 } else {
                     // Город в кэше не найден: получаем значение и кэшируем
                     require __DIR__ . '/../components/cities.php';
                     $cacheCity = CITIES[$this->city];
-                    $cache->set($this->city, json_encode($cacheCity), Weather::LONG_TIMEOUT);
+                    $cache->set($this->city, $cacheCity, Weather::LONG_TIMEOUT);
                 }
 
                 // Проверка корректности города
