@@ -106,10 +106,28 @@ class Weather extends Model
         $tableBody = $dom->getElementsByTagName('tbody');
         $tr = $tableBody[0]->getElementsByTagName('tr');
         $td = $tr[$day - 1]->getElementsByTagName('td');
+        $imgClouds = $td[3]->getElementsByTagName('img')[0]->getAttribute('src');
+        $cloudsPosition = strrpos($imgClouds, '/');
 
         $this->response['status'] = 'ok';
-        $this->response['temperature'] = $td[1]->nodeValue;
-
+        $this->response['temp_max'] = $td[1]->nodeValue;
+        $this->response['temp_min'] = $td[6]->nodeValue;
+        $this->response['pressure'] = ($td[2]->nodeValue + $td[7]->nodeValue) / 2;
+        $cloudsString = substr($imgClouds, $cloudsPosition + 1);
+        switch ($cloudsString) {
+            case 'sun.png':
+                $this->response['clouds'] = 0;
+                break;
+            case 'sunc.png':
+                $this->response['clouds'] = 25;
+                break;
+            case 'suncl.png':
+                $this->response['clouds'] = 50;
+                break;
+            case 'dull.png':
+                $this->response['clouds'] = 100;
+                break;
+        }
         $this->cacheTimeout = Weather::LONG_TIMEOUT;
     }
 
@@ -123,12 +141,19 @@ class Weather extends Model
         $endDate = date('Y-m-d', strtotime("{$this->date} +1 day"));
         $queryString = "https://api.weatherbit.io/v2.0/history/daily?city={$encodedCity}&country=Russia&start_date={$this->date}:00&end_date={$endDate}:00&key={$WEATHERBIT_API_KEY}";
         $jsonResponse = file_get_contents($queryString);
-        $arrayResponse = json_decode($jsonResponse, true);
+        $arrayResponse = json_decode($jsonResponse, true)['data'][0];
 
         $this->response['status'] = 'ok';
-        $this->response['temperature'] = $arrayResponse['data'][0]['max_temp'];
-        if ($this->response['temperature'] > 0) {
-            $this->response['temperature'] = "+{$this->response['temperature']}";
+        $this->response['temp_max'] = $arrayResponse['max_temp'];
+        $this->response['temp_min'] = $arrayResponse['min_temp'];
+        $this->response['pressure'] = round($arrayResponse['pres'] * 0.75);
+        $this->response['clouds'] = $arrayResponse['clouds'];
+
+        if ($this->response['temp_max'] > 0) {
+            $this->response['temp_max'] = "+{$this->response['temp_max']}";
+        }
+        if ($this->response['temp_min'] > 0) {
+            $this->response['temp_min'] = "+{$this->response['temp_min']}";
         }
 
         $this->cacheTimeout = Weather::SHORT_TIMEOUT;
@@ -142,12 +167,19 @@ class Weather extends Model
         $encodedCity = urlencode($this->city);
         $queryString = "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/{$encodedCity}/{$this->date}?include=days&unitGroup=metric&key=$VISUALCROSSING_API_KEY";
         $jsonResponse = file_get_contents($queryString);
-        $arrayResponse = json_decode($jsonResponse, true);
+        $arrayResponse = json_decode($jsonResponse, true)['days'][0];
 
         $this->response['status'] = 'ok';
-        $this->response['temperature'] = $arrayResponse['days'][0]['tempmax'];
-        if ($this->response['temperature'] > 0) {
-            $this->response['temperature'] = "+{$this->response['temperature']}";
+        $this->response['temp_max'] = $arrayResponse['tempmax'];
+        $this->response['temp_min'] = $arrayResponse['tempmin'];
+        $this->response['pressure'] = round($arrayResponse['pressure'] * 0.75);
+        $this->response['clouds'] = $arrayResponse['cloudcover'];
+
+        if ($this->response['temp_max'] > 0) {
+            $this->response['temp_max'] = "+{$this->response['temp_max']}";
+        }
+        if ($this->response['temp_min'] > 0) {
+            $this->response['temp_min'] = "+{$this->response['temp_min']}";
         }
     }
 }
