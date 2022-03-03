@@ -17,6 +17,8 @@ class Weather extends Model
     // 7 суток
     const LONG_TIMEOUT = 604800;
 
+    private $firstDate = '1997-04-01';
+
     public function __construct(&$request)
     {
         // Чтение параметров запроса
@@ -62,14 +64,14 @@ class Weather extends Model
                     $lastForecastDay = date('Y-m-d', strtotime('+7 day'));
 
                     // Получение погоды запросом в зависимости от даты
-                    if ($this->date >= '1997-04-01' && $this->date <= $dayBeforeYesterday) {
+                    if ($this->date >= $firstDate && $this->date <= $dayBeforeYesterday) {
                         $this->requestGismeteo($cacheCity, $year, $month, $day);
                     } elseif ($this->date > $dayBeforeYesterday && $this->date <= $today) {
                         $this->requestWeatherbit();
                     } elseif ($this->date > $today && $this->date <= $lastForecastDay) {
                         $this->requestVisualcrossing();
                     } else {
-                        $this->setError("date must be between 1997-04-01 and {$lastForecastDay}");
+                        $this->setError("date must be between {$firstDate} and {$lastForecastDay}");
                     }
                 } else {
                     $this->setError('wrong city');
@@ -92,7 +94,7 @@ class Weather extends Model
         $this->cacheTimeout = Weather::SHORT_TIMEOUT;
     }
 
-    // Получение исторических данных с 1997-04-01 до позавчерашнего дня
+    // Получение исторических данных с $firstDate до позавчерашнего дня
     private function requestGismeteo($city, $year, $month, $day)
     {
         //  Формирования адреса запроса, запрос, разбор ответа
