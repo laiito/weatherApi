@@ -64,14 +64,14 @@ class Weather extends Model
                     $lastForecastDay = date('Y-m-d', strtotime('+7 day'));
 
                     // Получение погоды запросом в зависимости от даты
-                    if ($this->date >= $firstDate && $this->date <= $dayBeforeYesterday) {
+                    if ($this->date >= $this->firstDate && $this->date <= $dayBeforeYesterday) {
                         $this->requestGismeteo($cacheCity, $year, $month, $day);
                     } elseif ($this->date > $dayBeforeYesterday && $this->date <= $today) {
                         $this->requestWeatherbit();
                     } elseif ($this->date > $today && $this->date <= $lastForecastDay) {
                         $this->requestVisualcrossing();
                     } else {
-                        $this->setError("date must be between {$firstDate} and {$lastForecastDay}");
+                        $this->setError("date must be between {$this->firstDate} and {$lastForecastDay}");
                     }
                 } else {
                     $this->setError('wrong city');
@@ -100,35 +100,63 @@ class Weather extends Model
         //  Формирования адреса запроса, запрос, разбор ответа
         $queryString = "http://www.gismeteo.ru/diary/{$city}/{$year}/{$month}/";
         $html = file_get_contents($queryString);
-
         $dom = new DOMDocument;
         $dom->loadHTML($html);
         $tableBody = $dom->getElementsByTagName('tbody');
-        $tr = $tableBody[0]->getElementsByTagName('tr');
-        $td = $tr[$day - 1]->getElementsByTagName('td');
-        $imgClouds = $td[3]->getElementsByTagName('img')[0]->getAttribute('src');
-        $cloudsPosition = strrpos($imgClouds, '/');
 
-        $this->response['status'] = 'ok';
-        $this->response['temp_max'] = $td[1]->nodeValue;
-        $this->response['temp_min'] = $td[6]->nodeValue;
-        $this->response['pressure'] = ($td[2]->nodeValue + $td[7]->nodeValue) / 2;
-        $cloudsString = substr($imgClouds, $cloudsPosition + 1);
-        switch ($cloudsString) {
-            case 'sun.png':
-                $this->response['clouds'] = 0;
-                break;
-            case 'sunc.png':
-                $this->response['clouds'] = 25;
-                break;
-            case 'suncl.png':
-                $this->response['clouds'] = 50;
-                break;
-            case 'dull.png':
-                $this->response['clouds'] = 100;
-                break;
+        if ($tableBody[0]) {
+            $tr = $tableBody[0]->getElementsByTagName('tr');
+
+            // Поиск необходимой строки
+            $found = false;
+            if ($tr[$day - 1]) {
+                // Найдена строка по номеру. Проверка, нужной ли дате соответствует строка
+                $td = $tr[$day - 1]->getElementsByTagName('td');
+                $found = ($td[0]->nodeValue == $day);
+            }
+            if (!$found) {
+                // Поиск строки с нужной датой среди всех строк
+                foreach ($tr as $trTry) {
+                    $td = $trTry->getElementsByTagName('td');
+                    if ($td[0]->nodeValue == $day) {
+                        $found = true;
+                        break;
+                    }
+                }
+            }
+            if ($found) {
+                // Запрошенная дата найдена
+                $imgClouds = $td[3]->getElementsByTagName('img')[0]->getAttribute('src');
+                $cloudsPosition = strrpos($imgClouds, '/');
+
+                $this->response['status'] = 'ok';
+                $this->response['temp_max'] = $td[1]->nodeValue;
+                $this->response['temp_min'] = $td[6]->nodeValue;
+                $this->response['pressure'] = $td[2]->nodeValue;
+                $cloudsString = substr($imgClouds, $cloudsPosition + 1);
+                switch ($cloudsString) {
+                    case 'sun.png':
+                        $this->response['clouds'] = 0;
+                        break;
+                    case 'sunc.png':
+                        $this->response['clouds'] = 25;
+                        break;
+                    case 'suncl.png':
+                        $this->response['clouds'] = 50;
+                        break;
+                    case 'dull.png':
+                        $this->response['clouds'] = 100;
+                        break;
+                }
+                $this->cacheTimeout = Weather::LONG_TIMEOUT;
+            } else {
+                // Запрошенная дата не найдена
+                $this->setError('no data');
+            }
+        } else {
+            // Данные за весь месяц отсутствуют
+            $this->setError('no data');
         }
-        $this->cacheTimeout = Weather::LONG_TIMEOUT;
     }
 
     // Получение погоды за вчера и сегодня
