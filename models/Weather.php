@@ -7,16 +7,15 @@ use yii\base\Model;
 
 class Weather extends Model
 {
+    const SHORT_TIMEOUT = 86400;
+    const LONG_TIMEOUT = 604800;
     private $response = [];
     private $city;
-    private $date;
-    private $cacheTimeout;
 
     // 24 часа
-    const SHORT_TIMEOUT = 86400;
+    private $date;
     // 7 суток
-    const LONG_TIMEOUT = 604800;
-
+    private $cacheTimeout;
     private $firstDate = '1997-04-01';
 
     public function __construct(&$request)
@@ -47,10 +46,7 @@ class Weather extends Model
 
                 // Поиск города в кэше
                 $cacheCity = $cache->get($this->city);
-                if ($cacheCity) {
-                    // Город в кэше найден
-                    $cacheCity = $cacheCity;
-                } else {
+                if (!$cacheCity) {
                     // Город в кэше не найден: получаем значение и кэшируем
                     require __DIR__ . '/../components/cities.php';
                     $cacheCity = CITIES[$this->city];
@@ -86,15 +82,7 @@ class Weather extends Model
     }
 
     // Установка сообщения об ошибке
-    private function setError($errorText)
-    {
-        $this->response['status'] = 'error';
-        $this->response['error'] = $errorText;
 
-        $this->cacheTimeout = Weather::SHORT_TIMEOUT;
-    }
-
-    // Получение исторических данных с $firstDate до позавчерашнего дня
     private function requestGismeteo($city, $year, $month, $day)
     {
         //  Формирования адреса запроса, запрос, разбор ответа
@@ -159,7 +147,18 @@ class Weather extends Model
         }
     }
 
+    // Получение исторических данных с $firstDate до позавчерашнего дня
+
+    private function setError($errorText)
+    {
+        $this->response['status'] = 'error';
+        $this->response['error'] = $errorText;
+
+        $this->cacheTimeout = Weather::SHORT_TIMEOUT;
+    }
+
     // Получение погоды за вчера и сегодня
+
     private function requestWeatherbit()
     {
         //  Формирования адреса запроса, запрос, разбор ответа
